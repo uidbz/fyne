@@ -50,11 +50,23 @@ type painter struct {
 	contextProvider     driver.WithContext
 	ctx                 context
 	fbHeight            int // current framebuffer height in pixels
+	fbWidth             int // current framebuffer width in pixels
 	maxTextureSize      int
 	pixScale            float32 // pre-calculate scale*texScale for each draw
 	programs            *programs
-	shaderPrograms      map[string]*shaderState // lazily compiled programs for user shaders, keyed by Shader.Name
+	shaderPrograms      map[string]*shaderState          // lazily compiled programs for user shaders, keyed by Shader.Name
 	texScale            float32
+	videoTargets        map[*canvas.GLVideo]*videoTarget // per-object FBO + texture for GLVideo objects
+}
+
+// videoTarget holds the offscreen framebuffer and its colour texture that a
+// GLVideo's renderer draws into, along with the pixel size they were allocated
+// for so we can reallocate when the object is resized.
+type videoTarget struct {
+	fbo    uint32
+	tex    uint32
+	width  int
+	height int
 }
 
 // Declare conformity to Painter interface
@@ -75,6 +87,9 @@ func (p *painter) Free(obj fyne.CanvasObject) {
 	// program - and reset its animation clock - every single frame.
 	if text, ok := obj.(*canvas.Text); ok {
 		p.freeClippedTextTexture(text)
+	}
+	if video, ok := obj.(*canvas.GLVideo); ok {
+		p.freeVideoTarget(video)
 	}
 	p.freeTexture(obj)
 }
@@ -107,6 +122,7 @@ func (p *painter) SetFrameBufferScale(scale float32) {
 
 func (p *painter) SetOutputSize(width, height int) {
 	p.ctx.Viewport(0, 0, width, height)
+	p.fbWidth = width
 	p.fbHeight = height
 	p.logError()
 }
