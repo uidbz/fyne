@@ -477,6 +477,8 @@ func (p *painter) drawObject(o fyne.CanvasObject, pos fyne.Position, frame fyne.
 		p.drawShader(obj, pos, frame)
 	case *canvas.Ellipse:
 		p.drawEllipse(obj, pos, frame)
+	case *canvas.GLVideo:
+		p.drawGLVideo(obj, pos, frame)
 	}
 }
 
