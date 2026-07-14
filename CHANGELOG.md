@@ -3,6 +3,12 @@
 This file lists the main changes with each version of the Fyne toolkit.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/fyne/releases). 
 
+## Unreleased
+
+### Added
+
+* New GLVideo canvas object for embedding GL-rendered video (such as libmpv's OpenGL Render API), working on X11, Wayland, macOS and Windows
+
 ## 2.8.1 - 26 Aug 2026
 
 ### Changed
@@ -37,7 +43,6 @@ More detailed release notes can be found on the [releases page](https://github.c
 * Data binding: handle the edge case where parsing a string as a float fails
 * Fix vendoring of apps using the Wayland build by keeping GLFW include headers
 * Resolve issue where some touch screen Linux taps were missed
-
 
 ## 2.8.0 - 11 Jul 2026
 
