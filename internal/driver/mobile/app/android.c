@@ -54,6 +54,7 @@ static jmethodID hide_keyboard_method;
 static jmethodID show_file_open_method;
 static jmethodID show_file_save_method;
 static jmethodID finish_method;
+static jmethodID set_system_bars_visible_method;
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 	JNIEnv* env;
@@ -97,6 +98,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
 		show_file_open_method = find_static_method(env, current_class, "showFileOpen", "(Ljava/lang/String;)V");
 		show_file_save_method = find_static_method(env, current_class, "showFileSave", "(Ljava/lang/String;Ljava/lang/String;)V");
 		finish_method = find_method(env, current_class, "finishActivity", "()V");
+		set_system_bars_visible_method = find_static_method(env, current_class, "setSystemBarsVisible", "(Z)V");
 
 		setCurrentContext(activity->vm, (*env)->NewGlobalRef(env, activity->clazz));
 
@@ -305,4 +307,16 @@ void Java_org_golang_app_GoNativeActivity_backPressed(JNIEnv *env, jclass clazz)
 
 void Java_org_golang_app_GoNativeActivity_setDarkMode(JNIEnv *env, jclass clazz, jboolean dark) {
     setDarkMode((bool)dark);
+}
+
+void setSystemBarsVisible(JNIEnv* env, bool visible) {
+	if (set_system_bars_visible_method == 0) {
+		return;
+	}
+	(*env)->CallStaticVoidMethod(
+		env,
+		current_class,
+		set_system_bars_visible_method,
+		(jboolean)visible
+	);
 }

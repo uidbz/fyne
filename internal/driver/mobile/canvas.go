@@ -33,6 +33,7 @@ type canvas struct {
 	size           fyne.Size
 	touched        map[int]mobile.Touchable
 	windowHead     fyne.CanvasObject
+	fullscreen     bool
 
 	dragOffset     fyne.Position
 	dragStart      fyne.Position

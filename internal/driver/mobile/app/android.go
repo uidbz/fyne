@@ -48,6 +48,7 @@ void hideKeyboard(JNIEnv* env);
 void showFileOpen(JNIEnv* env, char* mimes);
 void showFileSave(JNIEnv* env, char* mimes, char* filename);
 void finish(JNIEnv* env, jobject ctx);
+void setSystemBarsVisible(JNIEnv* env, bool visible);
 
 void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass clazz, jstring str);
 */
@@ -86,6 +87,19 @@ func GoBack() {
 	})
 	if err != nil {
 		log.Fatalf("app: %v", err)
+	}
+}
+
+// SetSystemBarsVisible shows or hides the Android system bars (status bar and navigation bar).
+// When hidden, the app enters immersive fullscreen mode where bars are only shown by swiping from edges.
+func SetSystemBarsVisible(visible bool) {
+	err := RunOnJVM(func(_, jniEnv, ctx uintptr) error {
+		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv))
+		C.setSystemBarsVisible(env, C.bool(visible))
+		return nil
+	})
+	if err != nil {
+		log.Printf("SetSystemBarsVisible error: %v", err)
 	}
 }
 

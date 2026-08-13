@@ -31,12 +31,14 @@ func (w *window) SetTitle(title string) {
 	w.title = title
 }
 
-func (*window) FullScreen() bool {
-	return true
+func (w *window) FullScreen() bool {
+	return w.canvas.fullscreen
 }
 
-func (*window) SetFullScreen(bool) {
-	// no-op
+func (w *window) SetFullScreen(fullscreen bool) {
+	w.canvas.fullscreen = fullscreen
+	// setSystemBarsImpl is defined per-platform (canvas_android.go / canvas_other.go).
+	setSystemBarsImpl(!fullscreen)
 }
 
 func (w *window) Resize(size fyne.Size) {

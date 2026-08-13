@@ -58,7 +58,20 @@ func gendex() error {
 	if err := os.MkdirAll(tmpdir+"/work/org/golang/app", 0o775); err != nil {
 		return err
 	}
+	// Try to find Java files - first try relative path (for development), then try GOPATH
 	javaFiles, err := filepath.Glob("../../../../internal/driver/mobile/app/*.java")
+	if err != nil || len(javaFiles) == 0 {
+		// Fallback: look in the current module's vendor directory or GOPATH
+		moduleRoot := os.Getenv("GOPATH")
+		if moduleRoot == "" {
+			moduleRoot = os.Getenv("HOME") + "/go"
+		}
+		javaFiles, err = filepath.Glob(moduleRoot + "/pkg/mod/fyne.io/fyne/v2@*/internal/driver/mobile/app/*.java")
+		if err != nil || len(javaFiles) == 0 {
+			// Last resort: try relative to GOPATH/src
+			javaFiles, err = filepath.Glob(moduleRoot + "/src/fyne.io/fyne/v2/internal/driver/mobile/app/*.java")
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -71,6 +84,11 @@ func gendex() error {
 	}
 	cmd := execabs.Command(
 		"javac",
+		// -parameters gives synthetic/mandated constructor params (e.g. this$0 on
+		// anonymous inner classes) a real name. Without it, JDK 21's javac emits a
+		// MethodParameters attribute with a null name, which build-tools 34 d8/r8
+		// NPEs on ("Cannot invoke String.length() because <parameter1> is null").
+		"-parameters",
 		"-source", "1.8",
 		"-target", "1.8",
 		"-bootclasspath", platform+"/android.jar",
@@ -86,12 +104,15 @@ func gendex() error {
 	if err != nil {
 		return err
 	}
-	cmd = execabs.Command(
-		buildTools+"/dx",
-		"--dex",
-		"--output="+tmpdir+"/classes.dex",
-		tmpdir+"/work",
-	)
+	// Use d8 instead of dx (dx is deprecated in newer Android SDK versions)
+	// Find all .class files in the work directory
+	classFiles, err := filepath.Glob(tmpdir + "/work/org/golang/app/*.class")
+	if err != nil {
+		return err
+	}
+	cmd = execabs.Command(buildTools + "/d8")
+	cmd.Args = append(cmd.Args, "--output", tmpdir, "--classpath", platform+"/android.jar")
+	cmd.Args = append(cmd.Args, classFiles...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		os.Stderr.Write(out)
 		return err

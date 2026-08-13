@@ -502,6 +502,39 @@ public class GoNativeActivity extends NativeActivity {
         }
     }
 
+    // setSystemBarsVisible shows or hides the status and navigation bars. Requires
+    // API 30+ (WindowInsetsController); a no-op on older versions.
+    public static void setSystemBarsVisible(boolean visible) {
+        if (goNativeActivity != null) {
+            goNativeActivity.doSetSystemBarsVisible(visible);
+        }
+    }
+
+    void doSetSystemBarsVisible(final boolean visible) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    WindowInsetsController controller = getWindow().getInsetsController();
+                    if (controller == null) {
+                        return;
+                    }
+                    if (visible) {
+                        controller.show(WindowInsets.Type.systemBars());
+                    } else {
+                        controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                        controller.hide(WindowInsets.Type.systemBars());
+                    }
+                } catch (Exception e) {
+                    Log.e("Fyne", "Failed to set system bars visibility", e);
+                }
+            }
+        });
+    }
+
     // -------------------------------------------------------------------------
     // Android accessibility bridge  (real-view overlay approach)
     // -------------------------------------------------------------------------
