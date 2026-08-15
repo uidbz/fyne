@@ -16,6 +16,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestCacheClean(t *testing.T) {
+	// The desktop default lifetime is 10 minutes (see lifetime_desktop.go), but
+	// this test drives a minute-scale mock clock, so pin the 1-minute lifetime it
+	// was written against. Must be set before the objects below are created, as
+	// their expiry is captured from ValidDuration at creation time.
+	origValid, origInterval := ValidDuration, cleanTaskInterval
+	ValidDuration = time.Minute
+	cleanTaskInterval = ValidDuration / 2
+	t.Cleanup(func() {
+		ValidDuration, cleanTaskInterval = origValid, origInterval
+	})
+
 	destroyedRenderersCnt := 0
 	testClearAll()
 	tm := &timeMock{}

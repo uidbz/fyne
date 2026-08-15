@@ -11,7 +11,9 @@ import (
 const cacheCleanCooldown = 10 * time.Second
 
 var (
-	ValidDuration     = 1 * time.Minute
+	// imgview fork change: the default is platform-dependent (see
+	// lifetime_desktop.go / lifetime_mobile.go); FYNE_CACHE still overrides.
+	ValidDuration     = defaultValidDuration
 	cleanTaskInterval = ValidDuration / 2
 
 	lastClean                     time.Time
