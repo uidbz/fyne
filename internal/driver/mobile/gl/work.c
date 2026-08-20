@@ -194,6 +194,21 @@ uintptr_t processFn(struct fnargs* args, char* parg) {
 	case glfnCopyTexSubImage2D:
 		glCopyTexSubImage2D((GLenum)args->a0, (GLint)args->a1, (GLint)args->a2, (GLint)args->a3, (GLint)args->a4, (GLint)args->a5, (GLsizei)args->a6, (GLsizei)args->a7);
 		break;
+	case glfnGenFramebuffer:
+		glGenFramebuffers(1, (GLuint*)&ret);
+		break;
+	case glfnBindFramebuffer:
+		glBindFramebuffer((GLenum)args->a0, (GLuint)args->a1);
+		break;
+	case glfnFramebufferTexture2D:
+		glFramebufferTexture2D((GLenum)args->a0, (GLenum)args->a1, (GLenum)args->a2, (GLuint)args->a3, (GLint)args->a4);
+		break;
+	case glfnDeleteFramebuffer:
+		glDeleteFramebuffers(1, (const GLuint*)(&args->a0));
+		break;
+	case glfnCheckFramebufferStatus:
+		ret = glCheckFramebufferStatus((GLenum)args->a0);
+		break;
 	}
 	return ret;
 }

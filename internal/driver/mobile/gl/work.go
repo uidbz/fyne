@@ -134,12 +134,28 @@ func (ctx *context) DoWork() {
 			}
 		}
 
-		// Process the queued GL functions.
-		for i, q := range queue {
-			ctx.cargs[i] = *(*C.struct_fnargs)(unsafe.Pointer(&q.args))
-			ctx.parg[i] = (*C.char)(q.parg)
+		// A call carrying a Go callback (fn) runs on this (GL) worker thread with
+		// the context current. It is always the trailing, blocking element of a
+		// batch (blocking stops accumulation above), so at most one appears here.
+		var cb func()
+		count := len(queue)
+		if count > 0 && queue[count-1].fn != nil {
+			cb = queue[count-1].fn
+			count--
 		}
-		ret := C.process(&ctx.cargs[0], ctx.parg[0], ctx.parg[1], ctx.parg[2], C.int(len(queue)))
+
+		// Process the queued GL primitive functions.
+		var ret C.uintptr_t
+		if count > 0 {
+			for i := 0; i < count; i++ {
+				ctx.cargs[i] = *(*C.struct_fnargs)(unsafe.Pointer(&queue[i].args))
+				ctx.parg[i] = (*C.char)(queue[i].parg)
+			}
+			ret = C.process(&ctx.cargs[0], ctx.parg[0], ctx.parg[1], ctx.parg[2], C.int(count))
+		}
+		if cb != nil {
+			cb()
+		}
 
 		// Cleanup and signal.
 		queue = queue[:0]

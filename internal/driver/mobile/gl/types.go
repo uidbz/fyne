@@ -78,6 +78,7 @@ func (v Buffer) c() uintptr      { return uintptr(v.Value) }
 func (v Texture) c() uintptr     { return uintptr(v.Value) }
 func (v Uniform) c() uintptr     { return uintptr(v.Value) }
 func (v VertexArray) c() uintptr { return uintptr(v.Value) }
+func (v Framebuffer) c() uintptr { return uintptr(v.Value) }
 
 func (v Attrib) String() string       { return fmt.Sprintf("Attrib(%d)", v.Value) }
 func (v Program) String() string      { return fmt.Sprintf("Program(%d)", v.Value) }

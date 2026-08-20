@@ -101,6 +101,36 @@ type Context interface {
 	//
 	// http://www.khronos.org/opengles/sdk/docs/man3/html/glGenVertexArrays.xhtml
 	CreateVertexArray() VertexArray
+
+	// CreateFramebuffer creates a framebuffer object.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glGenFramebuffers.xhtml
+	CreateFramebuffer() Framebuffer
+
+	// BindFramebuffer binds a framebuffer to the given target.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glBindFramebuffer.xhtml
+	BindFramebuffer(target Enum, fb Framebuffer)
+
+	// FramebufferTexture2D attaches a texture image to a framebuffer object.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glFramebufferTexture2D.xhtml
+	FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int)
+
+	// DeleteFramebuffer deletes the given framebuffer object.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glDeleteFramebuffers.xhtml
+	DeleteFramebuffer(v Framebuffer)
+
+	// CheckFramebufferStatus returns the completeness status of a framebuffer.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glCheckFramebufferStatus.xhtml
+	CheckFramebufferStatus(target Enum) Enum
+
+	// RunOnGLThread runs fn on the GL worker thread with the context current,
+	// blocking until it returns. It is a Fyne-fork extension used to marshal
+	// direct-GL renderers (e.g. libmpv) onto the thread that owns the context.
+	RunOnGLThread(fn func())
 	// DeleteBuffer deletes the given buffer object.
 	//
 	// http://www.khronos.org/opengles/sdk/docs/man3/html/glDeleteBuffers.xhtml

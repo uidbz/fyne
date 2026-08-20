@@ -190,6 +190,68 @@ func (ctx *context) CreateTexture() Texture {
 	}))}
 }
 
+func (ctx *context) CreateFramebuffer() Framebuffer {
+	return Framebuffer{Value: uint32(ctx.enqueue(call{ //gosec:disable G115 -- probably okay
+		args: fnargs{
+			fn: glfnGenFramebuffer,
+		},
+		blocking: true,
+	}))}
+}
+
+func (ctx *context) BindFramebuffer(target Enum, fb Framebuffer) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnBindFramebuffer,
+			a0: target.c(),
+			a1: fb.c(),
+		},
+	})
+}
+
+func (ctx *context) FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnFramebufferTexture2D,
+			a0: target.c(),
+			a1: attachment.c(),
+			a2: texTarget.c(),
+			a3: t.c(),
+			a4: uintptr(level),
+		},
+	})
+}
+
+func (ctx *context) DeleteFramebuffer(v Framebuffer) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnDeleteFramebuffer,
+			a0: v.c(),
+		},
+	})
+}
+
+func (ctx *context) CheckFramebufferStatus(target Enum) Enum {
+	return Enum(ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnCheckFramebufferStatus,
+			a0: target.c(),
+		},
+		blocking: true,
+	}))
+}
+
+// RunOnGLThread enqueues fn to run on the GL worker thread with the EGL context
+// current, blocking the caller until it completes. It lets direct-GL renderers
+// such as libmpv (which resolve GL entry points themselves and render
+// synchronously) execute on the one thread that owns the context.
+func (ctx *context) RunOnGLThread(fn func()) {
+	ctx.enqueue(call{
+		fn:       fn,
+		blocking: true,
+	})
+}
+
 func (ctx *context) CreateVertexArray() VertexArray {
 	return VertexArray{Value: uint32(ctx.enqueue(call{ //gosec:disable G115 -- probably okay
 		args: fnargs{

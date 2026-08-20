@@ -81,4 +81,9 @@ const (
 
 	DepthBufferBit = 0x00000100
 	ColorBufferBit = 0x00004000
+
+	FramebufferTarget   = 0x8D40
+	FramebufferBinding  = 0x8CA6
+	ColorAttachment0    = 0x8CE0
+	FramebufferComplete = 0x8CD5
 )

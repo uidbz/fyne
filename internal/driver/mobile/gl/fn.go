@@ -10,6 +10,12 @@ type call struct {
 	args     fnargs
 	parg     unsafe.Pointer
 	blocking bool
+
+	// fn, when non-nil, is a Go callback to run on the GL worker thread during
+	// DoWork (context current) instead of dispatching a GL primitive. Used to
+	// marshal direct-GL renderers (e.g. libmpv) onto the GL thread. Such a call
+	// is always blocking and is the trailing element of its DoWork batch.
+	fn func()
 }
 
 type fnargs struct {
@@ -81,6 +87,11 @@ const (
 	glfnCopyTexSubImage2D
 	glfnDeleteProgram
 	glfnGetIntegerv
+	glfnGenFramebuffer
+	glfnBindFramebuffer
+	glfnFramebufferTexture2D
+	glfnDeleteFramebuffer
+	glfnCheckFramebufferStatus
 )
 
 func goString(buf []byte) string {
