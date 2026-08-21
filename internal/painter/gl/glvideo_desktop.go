@@ -43,6 +43,7 @@ func (p *painter) drawGLVideo(v *canvas.GLVideo, pos fyne.Position, frame fyne.S
 	}
 
 	target := p.ensureVideoTarget(v, texW, texH)
+	target.painted = true
 
 	// Save the currently bound framebuffer so we can restore it: Fyne renders to
 	// the window's default framebuffer, which is not necessarily 0 on every

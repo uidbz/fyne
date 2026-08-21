@@ -63,16 +63,29 @@ type painter struct {
 // GLVideo's renderer draws into, along with the pixel size they were allocated
 // for so we can reallocate when the object is resized.
 type videoTarget struct {
-	fbo    uint32
-	tex    uint32
-	width  int
-	height int
+	fbo     uint32
+	tex     uint32
+	width   int
+	height  int
+	painted bool // set each frame the object is drawn; used by Clear to reap removed objects
 }
 
 // Declare conformity to Painter interface
 var _ Painter = (*painter)(nil)
 
 func (p *painter) Clear() {
+	// Reap video targets whose object was not drawn last frame (removed from the
+	// canvas). GLVideo targets must persist across refreshes - unlike ordinary
+	// textures they are the renderer's live output FBO, not a re-uploadable cache
+	// - so they are not freed in Free(); this is where stale ones are collected.
+	for v, t := range p.videoTargets {
+		if !t.painted {
+			p.freeVideoTarget(v)
+			continue
+		}
+		t.painted = false
+	}
+
 	r, g, b, a := theme.Color(theme.ColorNameBackground).RGBA()
 	p.ctx.ClearColor(float32(r)/max16bit, float32(g)/max16bit, float32(b)/max16bit, float32(a)/max16bit)
 	p.ctx.Clear(bitColorBuffer | bitDepthBuffer)
@@ -88,8 +101,10 @@ func (p *painter) Free(obj fyne.CanvasObject) {
 	if text, ok := obj.(*canvas.Text); ok {
 		p.freeClippedTextTexture(text)
 	}
-	if video, ok := obj.(*canvas.GLVideo); ok {
-		p.freeVideoTarget(video)
+	if _, ok := obj.(*canvas.GLVideo); ok {
+		// GLVideo targets persist across refreshes and are reaped in Clear when
+		// the object leaves the canvas; do not free here (Free runs every refresh).
+		return
 	}
 	p.freeTexture(obj)
 }

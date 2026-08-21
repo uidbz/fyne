@@ -43,6 +43,7 @@ func (p *painter) drawGLVideo(v *canvas.GLVideo, pos fyne.Position, frame fyne.S
 	}
 
 	target := p.ensureVideoTarget(v, texW, texH)
+	target.painted = true
 
 	// libmpv resolves GL entry points itself and renders synchronously; it must
 	// run on the thread that owns the EGL context. It binds the supplied FBO via
