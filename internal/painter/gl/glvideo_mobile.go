@@ -49,17 +49,18 @@ func (p *painter) drawGLVideo(v *canvas.GLVideo, pos fyne.Position, frame fyne.S
 	// run on the thread that owns the EGL context. It binds the supplied FBO via
 	// MPV_RENDER_PARAM_OPENGL_FBO. RunOnGLThread blocks until the frame is drawn,
 	// so the composite below always reads a complete texture.
+	glctx := p.contextProvider.Context().(gl.Context)
 	fbo, w, h := target.fbo, target.width, target.height
-	p.glctx().RunOnGLThread(func() {
+	glctx.RunOnGLThread(func() {
 		v.Renderer.RenderInto(fbo, w, h)
 	})
 
 	// mpv leaves its own FBO bound and the viewport changed; restore the window
 	// framebuffer (0 on an EGL window surface) and viewport for scene drawing.
-	p.glctx().BindFramebuffer(gl.FramebufferTarget, gl.Framebuffer{})
+	glctx.BindFramebuffer(gl.FramebufferTarget, gl.Framebuffer{})
 	p.ctx.Viewport(0, 0, p.fbWidth, p.fbHeight)
 
-	p.drawTextureRegion(Texture{Value: target.tex}, drawPos, drawSize, frame)
+	p.drawTextureRegion(Texture{Value: target.tex}, drawPos, drawSize, frame, canvas.ImageFillStretch, 1, 0, 0, 0)
 }
 
 // ensureVideoTarget returns the FBO/texture for the given object, (re)allocating
@@ -74,7 +75,7 @@ func (p *painter) ensureVideoTarget(v *canvas.GLVideo, width, height int) *video
 		return t
 	}
 
-	glctx := p.glctx()
+	glctx := p.contextProvider.Context().(gl.Context)
 	if t == nil {
 		t = &videoTarget{}
 		t.tex = glctx.CreateTexture().Value
@@ -106,7 +107,7 @@ func (p *painter) freeVideoTarget(v *canvas.GLVideo) {
 	if t == nil {
 		return
 	}
-	glctx := p.glctx()
+	glctx := p.contextProvider.Context().(gl.Context)
 	glctx.DeleteFramebuffer(gl.Framebuffer{Value: t.fbo})
 	glctx.DeleteTexture(gl.Texture{Value: t.tex})
 	delete(p.videoTargets, v)
