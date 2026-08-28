@@ -726,6 +726,44 @@ func (t *Table) findY(row int) (cellY float32, cellHeight float32) {
 	return cellY, cellHeight
 }
 
+// RowInsertGapAt maps a Y coordinate in this Table's local coordinate space
+// (relative to the widget's top-left, including any sticky header row) to a row
+// insertion gap and the local Y at which a drop-indicator line for that gap
+// should be drawn. The gap is in [0, rows]: 0 means "above the first row", rows
+// means "below the last". Both results account for the header row, per-row
+// heights, inter-row padding, and the current vertical scroll offset. It is
+// meant for an external (cross-widget) drag where no cell receives the pointer
+// events, so the destination index and indicator line must be derived from a
+// bare position. It is safe before the first layout (returns 0, headerY).
+func (t *Table) RowInsertGapAt(y float32) (gap int, lineY float32) {
+	rows := 0
+	if t.Length != nil {
+		rows, _ = t.Length()
+	}
+	off := t.stuckHeight
+	if t.ShowHeaderRow {
+		off += t.headerSize.Height
+	}
+	toLocal := func(contentY float32) float32 { return contentY - t.offset.Y + off }
+	if rows == 0 || t.cellSize.Height <= 0 {
+		return 0, toLocal(0)
+	}
+	padding := t.Theme().Size(theme.SizeNamePadding)
+	cy := y - off + t.offset.Y // pointer in the scrolling content's space
+	top := float32(0)
+	for i := 0; i < rows; i++ {
+		height := t.cellSize.Height
+		if h, ok := t.rowHeights[i]; ok {
+			height = h
+		}
+		if cy < top+height/2 {
+			return i, toLocal(top)
+		}
+		top += height + padding
+	}
+	return rows, toLocal(top - padding)
+}
+
 func (t *Table) finishScroll() {
 	if t.moveCallback != nil {
 		t.moveCallback()
