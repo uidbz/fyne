@@ -217,8 +217,15 @@ func (i *Image) Resize(s fyne.Size) {
 		Refresh(i) // invalidate texture
 	} else if i.Image == nil {
 		i.Refresh()
+	} else if i.ScaleMode == ImageScaleFastest || i.ScaleMode == ImageScalePixels {
+		// The uploaded texture holds the source pixels unchanged for these
+		// modes (see internal/painter.scaleImage), so its content does not
+		// depend on the object size. Skip the texture invalidation that
+		// Refresh would queue and only request a redraw: the GPU rescales the
+		// cached texture. This keeps per-frame resizes (pinch zoom) cheap.
+		repaint(i)
 	} else {
-		Refresh(i) // just re-size using GPU scaling
+		Refresh(i) // ImageScaleSmooth resamples on the CPU to the target size
 	}
 }
 
