@@ -502,8 +502,13 @@ public class GoNativeActivity extends NativeActivity {
         }
     }
 
-    // setSystemBarsVisible shows or hides the status and navigation bars. Requires
-    // API 30+ (WindowInsetsController); a no-op on older versions.
+    // systemBarsHidden is the requested state (true = immersive fullscreen).
+    // Only touched on the UI thread.
+    private boolean systemBarsHidden = false;
+
+    // setSystemBarsVisible shows or hides the status and navigation bars
+    // ("immersive sticky" fullscreen: while hidden, an edge swipe reveals them
+    // transiently). Called from Go via JNI on any thread.
     public static void setSystemBarsVisible(boolean visible) {
         if (goNativeActivity != null) {
             goNativeActivity.doSetSystemBarsVisible(visible);
@@ -511,28 +516,60 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     void doSetSystemBarsVisible(final boolean visible) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            return;
-        }
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    WindowInsetsController controller = getWindow().getInsetsController();
-                    if (controller == null) {
-                        return;
-                    }
-                    if (visible) {
-                        controller.show(WindowInsets.Type.systemBars());
-                    } else {
-                        controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                        controller.hide(WindowInsets.Type.systemBars());
-                    }
-                } catch (Exception e) {
-                    Log.e("Fyne", "Failed to set system bars visibility", e);
-                }
+                systemBarsHidden = !visible;
+                applySystemBarsVisibility();
             }
         });
+    }
+
+    // applySystemBarsVisibility pushes systemBarsHidden to the window. On API 30+
+    // it uses WindowInsetsController; older versions fall back to the legacy
+    // SYSTEM_UI_FLAG_* immersive flags. Must run on the UI thread.
+    private void applySystemBarsVisibility() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                WindowInsetsController controller = getWindow().getInsetsController();
+                if (controller == null) {
+                    return;
+                }
+                if (systemBarsHidden) {
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    controller.hide(WindowInsets.Type.systemBars());
+                } else {
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_DEFAULT);
+                    controller.show(WindowInsets.Type.systemBars());
+                }
+                return;
+            }
+
+            View decorView = getWindow().getDecorView();
+            int immersive = View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            // Preserve the LIGHT_* appearance bits set by updateSystemBarsAppearance.
+            int flags = decorView.getSystemUiVisibility();
+            if (systemBarsHidden) {
+                flags |= immersive;
+            } else {
+                flags &= ~immersive;
+            }
+            decorView.setSystemUiVisibility(flags);
+        } catch (Exception e) {
+            Log.e("Fyne", "Failed to set system bars visibility", e);
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // The system clears immersive state when focus is lost (notification
+        // shade, dialogs, task switcher); restore it when we get focus back.
+        if (hasFocus && systemBarsHidden) {
+            applySystemBarsVisibility();
+        }
     }
 
     // -------------------------------------------------------------------------

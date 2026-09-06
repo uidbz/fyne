@@ -26,6 +26,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"golang.org/x/sys/execabs"
 )
@@ -82,6 +84,7 @@ func gendex() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("gendex: platform", platform)
 	cmd := execabs.Command(
 		"javac",
 		// -parameters gives synthetic/mandated constructor params (e.g. this$0 on
@@ -104,6 +107,7 @@ func gendex() error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("gendex: build-tools", buildTools)
 	// Use d8 instead of dx (dx is deprecated in newer Android SDK versions)
 	// Find all .class files in the work directory
 	classFiles, err := filepath.Glob(tmpdir + "/work/org/golang/app/*.class")
@@ -155,6 +159,10 @@ func gendex() error {
 	return nil
 }
 
+// findLast returns the child of path with the highest version number, e.g.
+// platforms/android-35 over android-28 and android-Q (previews sort last),
+// build-tools/29.0.2 over 28.0.3. Directory order is not sorted, so relying
+// on Readdirnames order picked an arbitrary SDK.
 func findLast(path string) (string, error) {
 	dir, err := os.Open(path)
 	if err != nil {
@@ -164,7 +172,49 @@ func findLast(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(children) == 0 {
+		return "", errors.New("no entries in " + path)
+	}
+	sort.SliceStable(children, func(i, j int) bool {
+		return versionLess(children[i], children[j])
+	})
 	return path + "/" + children[len(children)-1], nil
+}
+
+// versionKey extracts the numeric components after the last '-' of a name
+// ("android-35" -> [35], "29.0.2" -> [29 0 2]). Names without a leading
+// number ("android-Q") yield nil and sort before everything numeric.
+func versionKey(name string) []int {
+	if i := strings.LastIndex(name, "-"); i >= 0 {
+		name = name[i+1:]
+	}
+	var key []int
+	for _, part := range strings.Split(name, ".") {
+		n := 0
+		digits := 0
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				break
+			}
+			n = n*10 + int(r-'0')
+			digits++
+		}
+		if digits == 0 {
+			break
+		}
+		key = append(key, n)
+	}
+	return key
+}
+
+func versionLess(a, b string) bool {
+	ka, kb := versionKey(a), versionKey(b)
+	for i := 0; i < len(ka) && i < len(kb); i++ {
+		if ka[i] != kb[i] {
+			return ka[i] < kb[i]
+		}
+	}
+	return len(ka) < len(kb)
 }
 
 var header = `// Copyright 2015 The Go Authors.  All rights reserved.
