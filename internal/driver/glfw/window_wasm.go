@@ -89,6 +89,9 @@ type window struct {
 	requestedWidth, requestedHeight int
 	shouldWidth, shouldHeight       int
 	shouldExpand                    bool
+	// repaintAfterResize is Wayland-only (see window_desktop.go); declared
+	// here too so shared code referencing it compiles on all targets.
+	repaintAfterResize bool
 
 	pending []func()
 

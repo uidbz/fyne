@@ -315,6 +315,15 @@ func (w *window) processResized(width, height int) {
 	w.RunWithContext(func() {
 		w.platformResize(canvasSize)
 	})
+
+	// Wayland: the first buffer swapped after a resize may still be allocated
+	// at the old size (Mesa's back-buffer allocation lags the wl_egl_window
+	// resize), leaving the window drawn at stale geometry. Ask the draw loop
+	// for one extra repaint after the next paint so a correctly-sized buffer
+	// is committed right behind it.
+	if build.IsWayland {
+		w.repaintAfterResize = true
+	}
 }
 
 func (w *window) processFrameSized(width, height int) {

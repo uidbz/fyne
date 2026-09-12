@@ -75,6 +75,10 @@ func (d *gLDriver) drawSingleFrame() {
 					refreshed = true
 				}
 			})
+			if w.repaintAfterResize {
+				w.repaintAfterResize = false
+				w.canvas.SetDirty()
+			}
 			w.updateAccessibility()
 		} else {
 			w.markCacheAlive()

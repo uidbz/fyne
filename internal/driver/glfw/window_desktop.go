@@ -116,6 +116,12 @@ type window struct {
 	requestedWidth, requestedHeight int
 	shouldWidth, shouldHeight       int
 	shouldExpand                    bool
+	// repaintAfterResize (Wayland only) asks the draw loop for one extra
+	// repaint following the next paint: the first buffer swapped after a
+	// resize can still be allocated at the old size (Mesa's back-buffer
+	// allocation lags the wl_egl_window resize), leaving the window drawn
+	// at stale geometry until the second buffer is committed.
+	repaintAfterResize bool
 
 	pending []func()
 
