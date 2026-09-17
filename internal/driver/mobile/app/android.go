@@ -49,6 +49,8 @@ void showFileOpen(JNIEnv* env, char* mimes);
 void showFileSave(JNIEnv* env, char* mimes, char* filename);
 void finish(JNIEnv* env, jobject ctx);
 void setSystemBarsVisible(JNIEnv* env, bool visible);
+void mediaSessionUpdate(JNIEnv* env, jobject ctx, char* title, char* artist, char* album, void* art, int artLen, bool playing, jlong posMs, jlong durMs);
+void mediaSessionStop(JNIEnv* env, jobject ctx);
 
 void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass clazz, jstring str);
 */
@@ -61,6 +63,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -100,6 +103,77 @@ func SetSystemBarsVisible(visible bool) {
 	})
 	if err != nil {
 		log.Printf("SetSystemBarsVisible error: %v", err)
+	}
+}
+
+// -------------------------------------------------------------------------
+// Media session / foreground playback service bridge (PlaybackService).
+// -------------------------------------------------------------------------
+
+// MediaSessionUpdate pushes the current track metadata and playback state to
+// the Android media session, starting the foreground playback service (and
+// its notification) on first use. A nil art keeps the previously sent
+// artwork; an empty non-nil slice clears it.
+func MediaSessionUpdate(title, artist, album string, art []byte, playing bool, posMs, durMs int64) error {
+	cTitle := C.CString(title)
+	defer C.free(unsafe.Pointer(cTitle))
+	cArtist := C.CString(artist)
+	defer C.free(unsafe.Pointer(cArtist))
+	cAlbum := C.CString(album)
+	defer C.free(unsafe.Pointer(cAlbum))
+
+	// nil slice keeps the artwork; empty non-nil clears it; len>0 replaces.
+	artLen := C.int(-1)
+	var artPtr unsafe.Pointer
+	if art != nil {
+		artLen = C.int(len(art))
+		if len(art) > 0 {
+			artPtr = unsafe.Pointer(&art[0])
+		}
+	}
+
+	return RunOnJVM(func(_, jniEnv, ctx uintptr) error {
+		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
+		C.mediaSessionUpdate(env, C.jobject(ctx), cTitle, cArtist, cAlbum, artPtr, artLen,
+			C.bool(playing), C.jlong(posMs), C.jlong(durMs))
+		return nil
+	})
+}
+
+// MediaSessionStop tears down the media session and the foreground service,
+// removing the playback notification.
+func MediaSessionStop() error {
+	return RunOnJVM(func(_, jniEnv, ctx uintptr) error {
+		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
+		C.mediaSessionStop(env, C.jobject(ctx))
+		return nil
+	})
+}
+
+var mediaHandler struct {
+	sync.RWMutex
+	fn func(action int, arg int64)
+}
+
+// SetMediaActionHandler registers the callback for transport actions
+// (notification buttons, lock screen, headset buttons) and audio events
+// (focus changes, headphone unplug) forwarded by the playback service.
+// Action codes mirror the ACT_* constants in PlaybackService.java; the typed
+// mapping lives in fyne.io/fyne/v2/driver/mobile. The handler is invoked on
+// a service thread and must not block.
+func SetMediaActionHandler(fn func(action int, arg int64)) {
+	mediaHandler.Lock()
+	mediaHandler.fn = fn
+	mediaHandler.Unlock()
+}
+
+//export goMediaAction
+func goMediaAction(action C.int, arg C.longlong) {
+	mediaHandler.RLock()
+	fn := mediaHandler.fn
+	mediaHandler.RUnlock()
+	if fn != nil {
+		fn(int(action), int64(arg))
 	}
 }
 

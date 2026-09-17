@@ -56,6 +56,10 @@ static jmethodID show_file_save_method;
 static jmethodID finish_method;
 static jmethodID set_system_bars_visible_method;
 
+static jclass playback_service_class;
+static jmethodID media_session_update_method;
+static jmethodID media_session_stop_method;
+
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 	JNIEnv* env;
 	if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) {
@@ -99,6 +103,11 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
 		show_file_save_method = find_static_method(env, current_class, "showFileSave", "(Ljava/lang/String;Ljava/lang/String;)V");
 		finish_method = find_method(env, current_class, "finishActivity", "()V");
 		set_system_bars_visible_method = find_static_method(env, current_class, "setSystemBarsVisible", "(Z)V");
+
+		playback_service_class = find_class(env, "org/golang/app/PlaybackService");
+		playback_service_class = (*env)->NewGlobalRef(env, playback_service_class);
+		media_session_update_method = find_static_method(env, playback_service_class, "mediaSessionUpdate", "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[BZJJ)V");
+		media_session_stop_method = find_static_method(env, playback_service_class, "mediaSessionStop", "(Landroid/content/Context;)V");
 
 		setCurrentContext(activity->vm, (*env)->NewGlobalRef(env, activity->clazz));
 
@@ -318,5 +327,53 @@ void setSystemBarsVisible(JNIEnv* env, bool visible) {
 		current_class,
 		set_system_bars_visible_method,
 		(jboolean)visible
+	);
+}
+
+// -------------------------------------------------------------------------
+// PlaybackService (media session / foreground service) bridge.
+// -------------------------------------------------------------------------
+
+void Java_org_golang_app_PlaybackService_nativeMediaAction(JNIEnv *env, jclass clazz, jint action, jlong arg) {
+	goMediaAction(action, arg);
+}
+
+void mediaSessionUpdate(JNIEnv* env, jobject ctx, char* title, char* artist, char* album, void* art, int artLen, bool playing, jlong posMs, jlong durMs) {
+	if (media_session_update_method == 0) {
+		return;
+	}
+	jstring jtitle = (*env)->NewStringUTF(env, title);
+	jstring jartist = (*env)->NewStringUTF(env, artist);
+	jstring jalbum = (*env)->NewStringUTF(env, album);
+	jbyteArray jart = NULL;
+	if (artLen >= 0) {
+		jart = (*env)->NewByteArray(env, artLen);
+		if (artLen > 0) {
+			(*env)->SetByteArrayRegion(env, jart, 0, artLen, (jbyte*)art);
+		}
+	}
+	(*env)->CallStaticVoidMethod(
+		env,
+		playback_service_class,
+		media_session_update_method,
+		ctx, jtitle, jartist, jalbum, jart, (jboolean)playing, posMs, durMs
+	);
+	(*env)->DeleteLocalRef(env, jtitle);
+	(*env)->DeleteLocalRef(env, jartist);
+	(*env)->DeleteLocalRef(env, jalbum);
+	if (jart != NULL) {
+		(*env)->DeleteLocalRef(env, jart);
+	}
+}
+
+void mediaSessionStop(JNIEnv* env, jobject ctx) {
+	if (media_session_stop_method == 0) {
+		return;
+	}
+	(*env)->CallStaticVoidMethod(
+		env,
+		playback_service_class,
+		media_session_stop_method,
+		ctx
 	);
 }
