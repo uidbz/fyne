@@ -171,7 +171,42 @@ func (tbl *Table) RefByName(name string) (TableRef, error) {
 			}
 		}
 	}
+	// The embedded table was generated from android-MinSDK and predates
+	// attributes added in later API levels. Look those up in the stable AOSP
+	// ID map before giving up.
+	if late, ok := attrsAddedAfterMinSDK[name]; ok {
+		return TableRef(late.ref), nil
+	}
 	return 0, fmt.Errorf("failed to find table ref by %q", name)
+}
+
+// lateAttr describes a framework attribute missing from the embedded
+// (android-15-era) table: its AOSP resource ID (stable by construction) plus
+// how to encode its values. Add entries when a manifest attribute fails with
+// "failed to find table ref"; the ID and flag values can be read off with
+// `aapt2 dump resources platforms/android-<N>/android.jar`.
+type lateAttr struct {
+	ref   uint32
+	flags map[string]uint32 // flag name → bit value, for flags-type attributes
+}
+
+// attrsAddedAfterMinSDK maps framework attribute names missing from the
+// embedded table to their stable AOSP resource IDs.
+var attrsAddedAfterMinSDK = map[string]lateAttr{
+	// android:foregroundServiceType (API 29), required on services with an
+	// FGS type when targeting API 34+.
+	"attr/foregroundServiceType": {
+		ref: 0x01010599,
+		flags: map[string]uint32{
+			"camera": 0x00000040, "connectedDevice": 0x00000010,
+			"dataSync": 0x00000001, "health": 0x00000100, "location": 0x00000008,
+			"mediaPlayback": 0x00000002, "mediaProcessing": 0x00002000,
+			"mediaProjection": 0x00000020, "microphone": 0x00000080,
+			"phoneCall": 0x00000004, "remoteMessaging": 0x00000200,
+			"shortService": 0x00000800, "specialUse": 0x40000000,
+			"systemExempted": 0x00000400,
+		},
+	},
 }
 
 // UnmarshalBinary creates the table from binary data

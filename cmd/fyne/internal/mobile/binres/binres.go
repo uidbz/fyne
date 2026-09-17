@@ -656,6 +656,20 @@ func addAttributeNamespace(attr xml.Attr, nattr *Attribute, tbl *Table, pool *Po
 	}
 	nt, err := ref.Resolve(tbl)
 	if err != nil {
+		// Attributes added after the embedded table's platform resolve by ID
+		// but have no table entry; encode them from the fallback map instead
+		// (see attrsAddedAfterMinSDK).
+		if late, ok := attrsAddedAfterMinSDK["attr/"+attr.Name.Local]; ok && late.flags != nil {
+			nattr.TypedValue.Type = DataIntHex
+			for _, x := range strings.Split(attr.Value, "|") {
+				v, ok := late.flags[strings.TrimSpace(x)]
+				if !ok {
+					return fmt.Errorf("invalid %s flag %q", attr.Name.Local, x)
+				}
+				nattr.TypedValue.Value |= v
+			}
+			return nil
+		}
 		return err
 	}
 	if len(nt.values) == 0 {
