@@ -18,9 +18,21 @@
 
 static jclass current_class;
 
-static jclass find_class(JNIEnv *env, const char *class_name) {
-	jclass clazz = (*env)->FindClass(env, class_name);
-	if (clazz == NULL) {
+// FindClass resolves a class through the class loader of the calling Java
+// frame. ANativeActivity_onCreate is invoked from android.app.NativeActivity
+// (a boot-class-loader framework class), so a plain FindClass cannot see
+// APK-bundled classes like org/golang/app/PlaybackService. Load app classes
+// explicitly through the activity's own class loader instead.
+static jclass find_app_class(JNIEnv *env, jobject activity_obj, const char *class_name) {
+	jclass activity_class = (*env)->GetObjectClass(env, activity_obj);
+	jmethodID get_loader = (*env)->GetMethodID(env, activity_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
+	jobject loader = (*env)->CallObjectMethod(env, activity_obj, get_loader);
+	jclass loader_class = (*env)->FindClass(env, "java/lang/ClassLoader");
+	jmethodID load_class = (*env)->GetMethodID(env, loader_class, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+	jstring name = (*env)->NewStringUTF(env, class_name);
+	jclass clazz = (jclass)(*env)->CallObjectMethod(env, loader, load_class, name);
+	(*env)->DeleteLocalRef(env, name);
+	if (clazz == NULL || (*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionClear(env);
 		LOG_FATAL("cannot find %s", class_name);
 		return NULL;
@@ -104,7 +116,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
 		finish_method = find_method(env, current_class, "finishActivity", "()V");
 		set_system_bars_visible_method = find_static_method(env, current_class, "setSystemBarsVisible", "(Z)V");
 
-		playback_service_class = find_class(env, "org/golang/app/PlaybackService");
+		playback_service_class = find_app_class(env, activity->clazz, "org.golang.app.PlaybackService");
 		playback_service_class = (*env)->NewGlobalRef(env, playback_service_class);
 		media_session_update_method = find_static_method(env, playback_service_class, "mediaSessionUpdate", "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[BZJJ)V");
 		media_session_stop_method = find_static_method(env, playback_service_class, "mediaSessionStop", "(Landroid/content/Context;)V");
