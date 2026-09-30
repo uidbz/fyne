@@ -287,6 +287,16 @@ var (
 func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style fyne.TextStyle, advance *float32, scale float32,
 	cb func(run shaping.Output, x, y float32),
 ) (size fyne.Size, base float32) {
+	// The package-level HarfbuzzShaper keeps per-call scratch buffers, and the
+	// font map's face resolution fills per-face cmap caches; neither is safe
+	// for concurrent use. Hold runBufferMut for the whole walk: shaping the
+	// space probe and resolving faces before taking it let a background
+	// goroutine's measurement (e.g. a widget built off the UI thread during
+	// startup) corrupt a concurrent render — a harfbuzz "index out of range"
+	// panic on Android.
+	runBufferMut.Lock()
+	defer runBufferMut.Unlock()
+
 	s = strings.ReplaceAll(s, "\r", "")
 
 	runes := []rune(s)
@@ -320,7 +330,6 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style f
 	}
 
 	ins := splitEmojiSequences(in, faces, segmenter)
-	runBufferMut.Lock()
 	for _, in := range ins {
 		inEnd := in.RunEnd
 
@@ -350,7 +359,6 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style f
 	}
 	clear(runBuffer)
 	runBuffer = runBuffer[:0]
-	runBufferMut.Unlock()
 
 	*advance = x
 	return fyne.NewSize(*advance, fixed266ToFloat32(out.LineBounds.LineThickness())),
