@@ -57,6 +57,10 @@ type Table struct {
 	OnSelected   func(id TableCellID)                             `json:"-"`
 	OnUnselected func(id TableCellID)                             `json:"-"`
 
+	// OnBackgroundTapped is called when a tap lands inside the table but not
+	// on a cell, for example the empty space below the last row.
+	OnBackgroundTapped func(*fyne.PointEvent) `json:"-"`
+
 	// ShowHeaderRow specifies that a row should be added to the table with header content.
 	// This will default to an A-Z style content, unless overridden with `CreateHeader` and `UpdateHeader` calls.
 	//
@@ -626,15 +630,24 @@ func (t *Table) Tapped(e *fyne.PointEvent) {
 	if e.Position.X < 0 || e.Position.X >= t.Size().Width || e.Position.Y < 0 || e.Position.Y >= t.Size().Height {
 		t.selectedCell = nil
 		t.Refresh()
+		if t.OnBackgroundTapped != nil {
+			t.OnBackgroundTapped(e)
+		}
 		return
 	}
 
 	col := t.columnAt(e.Position)
 	if col == noCellMatch || col < 0 {
+		if t.OnBackgroundTapped != nil {
+			t.OnBackgroundTapped(e)
+		}
 		return // out of col range
 	}
 	row := t.rowAt(e.Position)
 	if row == noCellMatch || row < 0 {
+		if t.OnBackgroundTapped != nil {
+			t.OnBackgroundTapped(e)
+		}
 		return // out of row range
 	}
 
